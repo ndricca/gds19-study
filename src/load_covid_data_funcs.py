@@ -44,6 +44,11 @@ def merge_df_with_shp(prov_df, prov_shp):
 
 
 def load_data_with_shp(date=None):
+    """
+    Pipeline to produce the dataframe that will be visualized
+    :param date:
+    :return:
+    """
     if date is None:
         date = pd.Timestamp.now().strftime('%Y%m%d')  # 20200417
     prov_shp = get_prov_shp()
