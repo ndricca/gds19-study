@@ -1,11 +1,14 @@
 import contextily as ctx
+import imageio
+import logging
 from matplotlib import pyplot as plt
 from mapclassify import Quantiles, EqualInterval, FisherJenks, NaturalBreaks
 import numpy as np
+import os
 import seaborn as sns
-import imageio
 
 from src.config import FIGS_DIR
+from src.load_covid_data_funcs import load_data_with_shp
 
 
 def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), saveto=None):
@@ -47,21 +50,20 @@ def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), saveto=None):
     plt.show()
 
 
-def _plot_for_gif(df, date, scheme, var='totale_casi', k=4, x_max=20000, figsize=(16, 8)):
+def _plot_for_gif(df, date, scheme, is_global, var='totale_casi', k=4, x_max=20000, figsize=(16, 8)):
     db = df.loc[df['data'] == date]
     schemes = {
         'equalinterval': EqualInterval,
         'quantiles': Quantiles,
         'fisherjenks': FisherJenks,
-        'naturalbreaks': NaturalBreaks,
-        'globalquantiles': 'userdefined'
+        'naturalbreaks': NaturalBreaks
     }
     try:
         _ = schemes[scheme]
     except KeyError as e:
         raise RuntimeError("invalid scheme {e}, use one of {l}".format(e=e, l=schemes.keys()))
-    if scheme == 'globalquantiles':
-        classi = Quantiles(df[var], k=k)
+    if is_global:
+        classi = schemes[scheme](df[var], k=k)  #
         classification_kwds = {'bins': classi.bins.tolist()}
     else:
         classi = schemes[scheme](db[var], k=k)
@@ -73,9 +75,9 @@ def _plot_for_gif(df, date, scheme, var='totale_casi', k=4, x_max=20000, figsize
         ax1.axvline(cut, color='blue', linewidth=0.75)
     ax1.set_title('Value distribution')
     ax2.set_xlim(0, x_max)
-    if scheme == 'globalquantiles':
-        # Map
-        p = db.plot(column=var, scheme=schemes[scheme], classification_kwds=classification_kwds, alpha=0.95, k=k,
+    # Map
+    if is_global:
+        p = db.plot(column=var, scheme='userdefined', classification_kwds=classification_kwds, alpha=0.95, k=k,
                     legend=True, cmap=plt.cm.RdPu, ax=ax2, linewidth=0.1)
     else:
         p = db.plot(column=var, scheme=scheme, alpha=0.95, k=k, legend=True, cmap=plt.cm.RdPu, ax=ax2, linewidth=0.1)
@@ -90,29 +92,28 @@ def _plot_for_gif(df, date, scheme, var='totale_casi', k=4, x_max=20000, figsize
     return image
 
 
-def create_gif(df, scheme, var_col, k, dt_col='data'):
+def create_gif(df, scheme, var_col, k, is_global=True, dt_col='data'):
     """
     Save a gif file with day by day biplot of data using the specified scheme and k bins.
-    If scheme is set as globalquantiles, a unique scheme is used among all dates
+    If is_global is set as True, a unique scheme is used among all dates
     :param df: geopandas dataframe with all observations
     :param scheme: string that specifies which scheme will be used to create bins
     :param var_col: column with values
     :param k: number of bins
+    :param is_global: boolean, if True the same classification is kept among all dates
     :param dt_col: column with dates
     """
-    dates = df[dt_col].dropna().unique().tolist()
-    gif_file = "_".join([scheme] + [d.strftime('%Y%m%d') for d in [df['data'].max(), df['data'].min()]]) + ".gif"
+    dates = df[dt_col].dropna().drop_duplicates().values
+    flg_glb = "global" if is_global else "daily"
+    gif_file = "_".join([scheme, flg_glb] + [d.strftime('%Y%m%d') for d in [df['data'].max(), df['data'].min()]])
     kwargs_write = {'fps': 1.0, 'quantizer': 'nq'}
     imageio.mimsave(
-        os.path.join(FIGS_DIR, gif_file),
-        [_plot_for_gif(df=df, date=d, var=var_col, scheme=scheme, x_max=4000, k=k) for d in dates],
+        os.path.join(FIGS_DIR, gif_file + ".gif"),
+        [_plot_for_gif(df=df, date=d, var=var_col, scheme=scheme, x_max=4000, k=k, is_global=is_global) for d in dates],
         fps=1)
 
 
 if __name__ == '__main__':
-    import logging
-    import os
-    from src.load_covid_data_funcs import load_data_with_shp
 
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
