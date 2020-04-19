@@ -105,8 +105,8 @@ def calculate_cases_by_pop(merged_df, var_col='totale_casi'):
     df_with_feat = merged_df.copy()
     elder_labels = ['Y60-Y79', 'Y80+']
     df_with_feat['PERC_ANZIANI'] = df_with_feat.loc[:, elder_labels].sum(axis=1)
-    df_with_feat[var_col + 'PERC_POP_TOT'] = df_with_feat[var_col] / df_with_feat['TOT']
-    df_with_feat[var_col + 'PERC_POP_60+'] = df_with_feat[var_col] / df_with_feat['TOT'] * df_with_feat['PERC_ANZIANI']
+    df_with_feat[var_col + '_PERC_POP_TOT'] = df_with_feat[var_col] / df_with_feat['TOT']
+    df_with_feat[var_col + '_PERC_POP_60+'] = df_with_feat[var_col] / df_with_feat['TOT'] * df_with_feat['PERC_ANZIANI']
     return df_with_feat
 
 
@@ -157,7 +157,7 @@ def load_all_data_with_shp():
     enriched_prov_df = calculate_pop_features(df=merged_prov_df)
     prov_shp = get_prov_shp()
     df_with_shp = merge_df_with_shp(prov_df=enriched_prov_df, prov_shp=prov_shp)
-    return df_with_shp
+    return df_with_shp.to_crs(epsg=3857)
 
 
 if __name__ == '__main__':

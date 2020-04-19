@@ -11,7 +11,7 @@ from src.config import FIGS_DIR
 from src.load_covid_data_funcs import load_data_with_shp
 
 
-def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), saveto=None):
+def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), add_basemap=False, saveto=None):
     """
     Plot the distribution over value and geographical space of variable `var` using scheme `scheme`
     :param scheme: name of the classification scheme to use
@@ -19,6 +19,7 @@ def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), saveto=None):
     :param db: table with input data
     :param k: number of bins
     :param figsize: size of the figure to be created
+    :param add_basemap: boolean, if True a base is added. db must have crs with epsg=3857
     :param saveto: path for file to save the plot
     """
     schemes = {'equalinterval': EqualInterval,
@@ -43,7 +44,8 @@ def plot_scheme(scheme, var, db, k=7, figsize=(16, 8), saveto=None):
     ax2.axis('equal')
     ax2.set_axis_off()
     ax2.set_title('Geographical distribution')
-    ctx.add_basemap(ax2, url=ctx.providers.Stamen.TonerLite)
+    if add_basemap:
+        ctx.add_basemap(ax2, url=ctx.providers.Stamen.TonerLite)
     f.suptitle(scheme, size=25)
     if saveto:
         plt.savefig(saveto)
