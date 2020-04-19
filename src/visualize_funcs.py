@@ -105,7 +105,7 @@ def create_gif(df, scheme, var_col, k, is_global=True, dt_col='data'):
     """
     dates = df[dt_col].dropna().drop_duplicates().values
     flg_glb = "global" if is_global else "daily"
-    gif_file = "_".join([scheme, flg_glb] + [d.strftime('%Y%m%d') for d in [df['data'].max(), df['data'].min()]])
+    gif_file = "_".join([var_col, scheme, flg_glb] + [d.strftime('%Y%m%d') for d in [df['data'].max(), df['data'].min()]])
     kwargs_write = {'fps': 1.0, 'quantizer': 'nq'}
     imageio.mimsave(
         os.path.join(FIGS_DIR, gif_file + ".gif"),
