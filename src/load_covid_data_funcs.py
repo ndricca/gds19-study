@@ -37,8 +37,8 @@ def get_prov_all_dates():
     :return: pandas dataframe with covid data for selected all dates
     """
     logging.info("loading covid data from " + GH_COVID_ALL_URL)
-    prov_all_dt = pd.read_csv(GH_COVID_ALL_URL)
-    prov_all_dt['data'] = pd.to_datetime(prov_all_dt.loc[:, 'data'], errors='ignore').dt.floor('D').values
+    prov_all_dt = pd.read_csv(GH_COVID_ALL_URL, parse_dates=[0], infer_datetime_format=True)
+    prov_all_dt['data'] = prov_all_dt['data'].dt.floor('D')
     return prov_all_dt
 
 
@@ -92,13 +92,29 @@ def merge_istat_covid_df(prov_df, istat_df):
     return merged_df
 
 
-def calculate_pop_features(merged_df):
-    merged_with_feat_df = merged_df.copy()
+def add_daily_cases(df):
+    tot = df.set_index(['sigla_provincia', 'data']).sort_index()['totale_casi']
+    prev = tot.unstack().shift(periods=1, axis=1, fill_value=0).unstack()
+    diff = tot - prev
+    diff.name = 'variazione_casi'
+    df_with_daily = pd.merge(df, diff.reset_index(), on=['sigla_provincia', 'data'])
+    return df_with_daily
+
+
+def calculate_cases_by_pop(merged_df, var_col='totale_casi'):
+    df_with_feat = merged_df.copy()
     elder_labels = ['Y60-Y79', 'Y80+']
-    merged_with_feat_df['PERC_ANZIANI'] = merged_with_feat_df.loc[:, elder_labels].sum(axis=1)
-    merged_with_feat_df['CASI_POP_TOT'] = merged_with_feat_df['totale_casi'] / merged_with_feat_df['TOT']
-    merged_with_feat_df['CASI_POP_60+'] = merged_with_feat_df['totale_casi'] / merged_with_feat_df['TOT'] * merged_with_feat_df['PERC_ANZIANI']
-    return merged_with_feat_df
+    df_with_feat['PERC_ANZIANI'] = df_with_feat.loc[:, elder_labels].sum(axis=1)
+    df_with_feat[var_col + 'PERC_POP_TOT'] = df_with_feat[var_col] / df_with_feat['TOT']
+    df_with_feat[var_col + 'PERC_POP_60+'] = df_with_feat[var_col] / df_with_feat['TOT'] * df_with_feat['PERC_ANZIANI']
+    return df_with_feat
+
+
+def calculate_pop_features(df):
+    df_tot_features = calculate_cases_by_pop(merged_df=df, var_col='totale_casi')
+    df_with_daily = add_daily_cases(df=df_tot_features)
+    df_tot = calculate_cases_by_pop(merged_df=df_with_daily, var_col='variazione_casi')
+    return df_tot
 
 
 def merge_df_with_shp(prov_df, prov_shp):
@@ -137,8 +153,8 @@ def load_all_data_with_shp():
     istat_raw = read_tot_pop_prov()
     istat_df = filter_tot_pop(tot_pop_df=istat_raw)
     prov_df = get_prov_all_dates()
-    merged_prov_df = merge_istat_covid_df(prov_df=prov_df,istat_df=istat_df)
-    enriched_prov_df = calculate_pop_features(merged_df=merged_prov_df)
+    merged_prov_df = merge_istat_covid_df(prov_df=prov_df, istat_df=istat_df)
+    enriched_prov_df = calculate_pop_features(df=merged_prov_df)
     prov_shp = get_prov_shp()
     df_with_shp = merge_df_with_shp(prov_df=enriched_prov_df, prov_shp=prov_shp)
     return df_with_shp
@@ -148,9 +164,7 @@ if __name__ == '__main__':
     log_fmt = '%(asctime)s - %(name)s - %(levelname)s - %(message)s'
     logging.basicConfig(level=logging.INFO, format=log_fmt)
 
-    # date = '20200417'
-    # prov_shp = get_prov_shp()
-    # prov_df = get_prov_df(date=date)
-    # df_with_shp = merge_df_with_shp(prov_df=prov_df, prov_shp=prov_shp)
     df_with_shp = load_all_data_with_shp()
     logging.info("loading successful, with shape {}".format(df_with_shp.shape))
+    cols = ['data', 'TOT'] + [c for c in df_with_shp.columns if 'casi' in c]
+    df_with_shp[cols].head()
